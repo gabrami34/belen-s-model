@@ -41,6 +41,8 @@ to consumir-turtles
   ask ovejas [set peso peso + peso * consumo / 5]
 end
 
+to check_changes
+end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; VISULATION PROCEDURES
@@ -157,6 +159,24 @@ NIL
 NIL
 NIL
 1
+
+PLOT
+799
+172
+999
+322
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count turtles"
 
 @#$#@#$#@
 ## WHAT IS IT?
