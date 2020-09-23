@@ -1,56 +1,162 @@
 patches-own [altura numero-potrero]
 breed [ovejas oveja]
-turtles-own [peso consumo]
+breed [vacas vaca]
+breed [groups group]
+
+turtles-own [
+  peso
+  consumo
+  category
+  move-buffer ; buffer variable for managing synchronicity of the moves
+]
+
+groups-own [
+  category ; cow bulls stear
+  mean-weight
+  intake-rate
+]
+
+
+;;; SETUP AND GO BUTTONS ;;;
 
 to setup
   ca
-  iniciar-patches
+  init-groups
+;  iniciar-patches
   iniciar-turtles
   update-view
   reset-ticks
 end
 
 to go
+  ; first restting buffers
+  ask turtles [set move-buffer false]
   crecer-patches
-  mover-turtles
+  ask turtles [mover-turtles]
   consumir-turtles
   update-view
   tick
 end
 
-to iniciar-patches
-   ask patches [set altura 10 + random 5 ]
+
+;;; STARTING PATCHES AND TURTLES
+to init-groups
+;  create-groups 1 [
+;    set category "cows"
+;    set intake-rate intake-rate-cows
+;  ]
+;  create-groups 1 [
+;    set category "bulls"
+;    set intake-rate intake-rate-bulls
+;  ]
+;    create-groups 1 [
+;    set category "stears"
+;    set intake-rate intake-rate-stears
+;  ]
+
+ foreach ["cow" "bulls" "stears"][c ->
+    create-groups 1 [
+      set category c
+      if c = "cows" [set intake-rate intake-rate-cows set color pink]
+      if c = "bulls" [set intake-rate intake-rate-bulls set color blue]
+      if c = "stears" [set intake-rate intake-rate-stears set color gray]
+      set size 1
+      set shape "cow"
+    ]
+  ]
 end
 
-to iniciar-turtles
-  create-ovejas 15 [set color white set size 2 set shape "sheep"]
-  ask ovejas [set peso 40 + random 10]
-  ask ovejas [set consumo 0.03]
+to iniciar-patches
+  ask patches [set altura 10 + random 5]
   end
+
+to iniciar-turtles
+  create-ovejas n-ovejas-init             ;; creates n agents according to slides
+  create-vacas n-vacas-init
+  color-ovejas
+  color-vacas
+
+  ask ovejas [set peso 35 + random 10]
+  ask vacas [set peso 380 + random 50]
+
+  ask ovejas [set consumo 0.03]
+  ask vacas [set consumo 0.03]
+
+  ask ovejas [ set category "lamb"]
+  ask vacas [ set category "calf"]
+
+  end
+
+
+;;; PATCH RELATED ACTIONS ;;;
 
 to crecer-patches
   ask patches [set altura altura + 0.1 ]
 end
 
+
+;;; TURTLE RELATED ACTIONS ;;;
+
 to mover-turtles
-   ask ovejas [set heading random 360  fd 2]
+  if grazing-strategy = "random" [move-random]
+  if grazing-strategy = "alltogether" [move-alltogether]
+  if grazing-strategy = "forward" [move-forward]
+ ; 2Nd option (more compact)
+ ;  run (word "move-" grazing-strategy)
+;   ask turtles [set heading random 360  fd 2]
+end
+
+; random grazing option : all animals move randomly
+to move-random
+  move-to one-of neighbors
+end
+
+; alltogether grazing option  : all animals on smae plot move together
+to move-alltogether
+  let next-place one-of neighbors ; first i choose the next place
+  if not move-buffer [ ; if move-buffer is true, it has already moved so nothing happends
+    ask turtles-here with [not move-buffer]  [; selecting turtles on the patch who have not moved yet including myself
+      move-to next-place
+      set move-buffer true
+    ]
+  ]
+end
+
+; predefined moving grazing option
+to move-forward
+;  1st loop for changing line
+  let next-patch patch-at 1 0
+  ifelse (next-patch != nobody) [
+    move-to next-patch
+  ][
+    let up-patch  patch 0 (pycor + 1)
+    ifelse (up-patch != nobody) [move-to patch 0 (pycor + 1) output-print (word ticks " - i am moving up")][move-to patch 0 0 output-print "i am moving bakc home"]
+  ]
 end
 
 to consumir-turtles
-  ask ovejas [set altura altura - peso * consumo]
-  ask ovejas [set peso peso + peso * consumo / 5]
+  ask turtles [set altura altura - peso * consumo]
+  ask turtles [set peso peso + peso * consumo / 5]
 end
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; VISULATION PROCEDURES
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; VISUALIZATION;;;
 
-to update-view ; CHANGE THE VIEW ACCORDING TO THE SELECTOR
-  if pov-view = "altura-pastura" [
-    ask patches [
-      set pcolor scale-color green altura 50 0
-      set plabel altura]]
+to update-view                        ; change the view according to the selector
+  if pov-view = "altura pastura" [
+   ask patches [set pcolor scale-color green altura 50 0]
+    ask patches [set plabel altura]]
+  if pov-view = "clear view" [
+    ask patches [set pcolor scale-color green altura 50 0]
+    ask patches [set plabel ""]]
+end
+
+to color-ovejas
+  ask ovejas [set color white set size 2 set shape "sheep"]
+end
+
+to color-vacas
+  ask vacas [set color brown set size 3 set shape "cow"]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -79,24 +185,6 @@ GRAPHICS-WINDOW
 1
 ticks
 30.0
-
-PLOT
-0
-0
-0
-0
-plot 1
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot count turtles"
 
 BUTTON
 17
@@ -149,22 +237,12 @@ NIL
 NIL
 1
 
-CHOOSER
-633
-50
-771
-95
-pov-view
-pov-view
-"altura-pastura"
-0
-
 BUTTON
-655
-167
-756
-200
-NIL
+574
+107
+676
+140
+update-view
 update-view
 NIL
 1
@@ -175,6 +253,151 @@ NIL
 NIL
 NIL
 1
+
+CHOOSER
+551
+16
+689
+61
+pov-view
+pov-view
+"altura pastura" "clear view"
+1
+
+SLIDER
+8
+209
+180
+242
+n-ovejas-init
+n-ovejas-init
+0
+50
+20.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+7
+263
+179
+296
+n-vacas-init
+n-vacas-init
+0
+50
+18.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+9
+324
+181
+357
+grass-max-height
+grass-max-height
+10
+30
+30.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+7
+374
+179
+407
+grass-min-height
+grass-min-height
+0
+10
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+939
+10
+1078
+55
+grazing-strategy
+grazing-strategy
+"random" "alltogether" "forward"
+2
+
+PLOT
+696
+10
+929
+160
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"mean height" 1.0 0 -15040220 true "" "plot mean [altura] of patches"
+"min height" 1.0 0 -3844592 true "" "plot min [altura] of patches "
+"max height" 1.0 0 -10873583 true "" "plot max [altura] of patches"
+
+SLIDER
+588
+201
+760
+234
+intake-rate-bulls
+intake-rate-bulls
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+586
+240
+758
+273
+intake-rate-cows
+intake-rate-cows
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+584
+274
+756
+307
+intake-rate-stears
+intake-rate-stears
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
