@@ -1,125 +1,121 @@
-patches-own [altura numero-potrero]
-breed [ovejas oveja]
-breed [vacas vaca]
+patches-own [
+  tamaño
+  altura
+  densidad
+  materia-seca
+  numero-potrero
+]
+
 breed [groups group]
 
-turtles-own [
-  peso
-  consumo
+groups-own [
+  numero-de-animales
   category
+  peso
+  consumo-individual
+  consumo-total
+  gasto-energia
   move-buffer ; buffer variable for managing synchronicity of the moves
 ]
-
-groups-own [
-  category ; cow bulls stear
-  mean-weight
-  intake-rate
-]
-
 
 ;;; SETUP AND GO BUTTONS ;;;
 
 to setup
   ca
+  iniciar-patches
   init-groups
-;  iniciar-patches
-  iniciar-turtles
+  color-groups
   update-view
   reset-ticks
 end
 
 to go
   ; first restting buffers
-  ask turtles [set move-buffer false]
+  ask turtles [
+    set move-buffer false
+    mover-turtles
+  ]
   crecer-patches
-  ask turtles [mover-turtles]
-  consumir-turtles
+  consumir-grupos
   update-view
   tick
 end
 
 
 ;;; STARTING PATCHES AND TURTLES
-to init-groups
-;  create-groups 1 [
-;    set category "cows"
-;    set intake-rate intake-rate-cows
-;  ]
-;  create-groups 1 [
-;    set category "bulls"
-;    set intake-rate intake-rate-bulls
-;  ]
-;    create-groups 1 [
-;    set category "stears"
-;    set intake-rate intake-rate-stears
-;  ]
 
- foreach ["cow" "bulls" "stears"][c ->
-    create-groups 1 [
-      set category c
-      if c = "cows" [set intake-rate intake-rate-cows set color pink]
-      if c = "bulls" [set intake-rate intake-rate-bulls set color blue]
-      if c = "stears" [set intake-rate intake-rate-stears set color gray]
-      set size 1
-      set shape "cow"
-    ]
+to iniciar-patches
+  ask patches [
+    set tamaño 500                                ; tamaño del potrero en metros cuadrados
+    set altura 5 + random 5                      ; altura del pasto en centímetros
+    set densidad 0.5                              ; densidad del pasto en kilos de materia seca por centimetro
+    set materia-seca altura * densidad * tamaño   ; oferta de forraje total del potrero en kilo de materia seca
   ]
 end
 
-to iniciar-patches
-  ask patches [set altura 10 + random 5]
-  end
+to init-groups
+    create-groups 1 [
+      set category "cow"
+      set numero-de-animales numero-de-vacas
+      set peso peso-vaca
+      set consumo-individual peso * 0.03
+      set consumo-total consumo-individual * numero-de-vacas
+      set gasto-energia peso * 0.015
+  ]
 
-to iniciar-turtles
-  create-ovejas n-ovejas-init             ;; creates n agents according to slides
-  create-vacas n-vacas-init
-  color-ovejas
-  color-vacas
+  create-groups 1 [
+     set category "bull"
+     set numero-de-animales numero-de-toros
+     set peso peso-toro
+     set consumo-individual peso * 0.03
+     set consumo-total consumo-individual * numero-de-toros
+     set gasto-energia peso * 0.015
+  ]
 
-  ask ovejas [set peso 35 + random 10]
-  ask vacas [set peso 380 + random 50]
+  create-groups 1 [
+    set category "steer"
+    set numero-de-animales numero-de-novillos
+    set peso peso-novillo
+    set consumo-individual peso * 0.03
+    set consumo-total consumo-individual * numero-de-novillos
+    set gasto-energia peso * 0.015
+  ]
 
-  ask ovejas [set consumo 0.03]
-  ask vacas [set consumo 0.03]
-
-  ask ovejas [ set category "lamb"]
-  ask vacas [ set category "calf"]
-
-  end
+end
 
 
 ;;; PATCH RELATED ACTIONS ;;;
 
 to crecer-patches
-  ask patches [set altura altura + 0.1 ]
+  ask patches [set altura altura + pasture-growth]
 end
+
+
 
 
 ;;; TURTLE RELATED ACTIONS ;;;
 
+to consumir-grupos
+  ask turtles [set materia-seca materia-seca - consumo-total
+      set peso peso + consumo-individual / 1.5
+      set peso peso - gasto-energia
+    ]
+end
+
 to mover-turtles
   if grazing-strategy = "random" [move-random]
-  if grazing-strategy = "alltogether" [move-alltogether]
   if grazing-strategy = "forward" [move-forward]
+  if grazing-strategy = "highest" [move-highest]
  ; 2Nd option (more compact)
  ;  run (word "move-" grazing-strategy)
 ;   ask turtles [set heading random 360  fd 2]
 end
 
+;;; turtle movement options
+
 ; random grazing option : all animals move randomly
 to move-random
   move-to one-of neighbors
-end
-
-; alltogether grazing option  : all animals on smae plot move together
-to move-alltogether
-  let next-place one-of neighbors ; first i choose the next place
-  if not move-buffer [ ; if move-buffer is true, it has already moved so nothing happends
-    ask turtles-here with [not move-buffer]  [; selecting turtles on the patch who have not moved yet including myself
-      move-to next-place
-      set move-buffer true
-    ]
-  ]
 end
 
 ; predefined moving grazing option
@@ -134,9 +130,15 @@ to move-forward
   ]
 end
 
-to consumir-turtles
-  ask turtles [set altura altura - peso * consumo]
-  ask turtles [set peso peso + peso * consumo / 5]
+; moving to patch with highest grass
+to move-highest
+  let next-place max-one-of patches [altura] ; first i choose the next place
+  if not move-buffer [ ; if move-buffer is true, it has already moved so nothing happends
+    ask turtles-here with [not move-buffer]  [; selecting turtles on the patch who have not moved yet including myself
+      move-to next-place
+      set move-buffer true
+    ]
+  ]
 end
 
 
@@ -145,45 +147,45 @@ end
 to update-view                        ; change the view according to the selector
   if pov-view = "altura pastura" [
    ask patches [set pcolor scale-color green altura 50 0]
-    ask patches [set plabel altura]]
+    ask patches [set plabel precision altura 1]]
   if pov-view = "clear view" [
     ask patches [set pcolor scale-color green altura 50 0]
     ask patches [set plabel ""]]
 end
 
-to color-ovejas
-  ask ovejas [set color white set size 2 set shape "sheep"]
-end
-
-to color-vacas
-  ask vacas [set color brown set size 3 set shape "cow"]
+to color-groups
+  ask turtles [set size 1 set shape "cow"
+    if category = "cow" [set color red]
+    if category = "steer" [set color blue]
+    if category = "bull" [set color black]
+  ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-190
-48
-551
-410
+218
+22
+526
+331
 -1
 -1
-10.7
+30.0
 1
-10
+12
 1
 1
-1
-0
-0
-0
 1
 0
-32
-0
-32
 0
 0
 1
-ticks
+0
+9
+0
+9
+0
+0
+1
+days
 30.0
 
 BUTTON
@@ -221,10 +223,10 @@ NIL
 1
 
 BUTTON
-21
-117
-84
-150
+17
+118
+80
+151
 NIL
 go
 T
@@ -255,40 +257,25 @@ NIL
 1
 
 CHOOSER
-551
-16
-689
-61
+563
+37
+701
+82
 pov-view
 pov-view
 "altura pastura" "clear view"
-1
+0
 
 SLIDER
-8
-209
-180
-242
-n-ovejas-init
-n-ovejas-init
-0
-50
-20.0
+13
+182
+185
+215
+n-groups-init
+n-groups-init
 1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-7
-263
-179
-296
-n-vacas-init
-n-vacas-init
-0
-50
-18.0
+5
+2.0
 1
 1
 NIL
@@ -310,10 +297,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-7
-374
-179
-407
+9
+369
+181
+402
 grass-min-height
 grass-min-height
 0
@@ -325,20 +312,20 @@ NIL
 HORIZONTAL
 
 CHOOSER
-939
-10
-1078
-55
+570
+173
+709
+218
 grazing-strategy
 grazing-strategy
-"random" "alltogether" "forward"
-2
+"random" "forward" "highest"
+1
 
 PLOT
-696
-10
-929
-160
+728
+13
+961
+163
 plot 1
 NIL
 NIL
@@ -355,46 +342,106 @@ PENS
 "max height" 1.0 0 -10873583 true "" "plot max [altura] of patches"
 
 SLIDER
-588
-201
-760
-234
-intake-rate-bulls
-intake-rate-bulls
+12
+228
+184
+261
+pasture-growth
+pasture-growth
+0.1
+1
+0.5
+0.1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+222
+346
+420
+379
+numero-de-vacas
+numero-de-vacas
 0
 100
-50.0
+7.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-586
-240
-758
-273
-intake-rate-cows
-intake-rate-cows
+224
+387
+419
+420
+numero-de-toros
+numero-de-toros
 0
-100
-50.0
+10
+1.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-584
-274
-756
-307
-intake-rate-stears
-intake-rate-stears
+225
+426
+419
+459
+numero-de-novillos
+numero-de-novillos
 0
 100
-50.0
+3.0
 1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+429
+347
+601
+380
+peso-vaca
+peso-vaca
+200
+500
+200.0
+50
+1
+NIL
+HORIZONTAL
+
+SLIDER
+431
+387
+603
+420
+peso-toro
+peso-toro
+400
+700
+400.0
+50
+1
+NIL
+HORIZONTAL
+
+SLIDER
+432
+426
+604
+459
+peso-novillo
+peso-novillo
+200
+500
+250.0
+50
 1
 NIL
 HORIZONTAL
@@ -757,7 +804,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.4
+NetLogo 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
